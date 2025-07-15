@@ -75,17 +75,38 @@ if user_input:
 
     with st.chat_message("assistant"):
         with st.spinner("GPT가 해결 방안을 분석 중입니다..."):
-            query = build_official_query(user_input)
-            search_result = search_tool.run(query) # 질문을 기반으로 정부 공식 사이트에서 검색 진행
+            # 1️⃣ GPT로 법적 이슈 분류
+            issue_classification_prompt = f"""
+            다음 문장은 어떤 법적 문제에 해당합니까?
+            가능한 분류 중 정확히 하나만 골라주세요:
+
+            분류: 임금체불, 부당해고, 개인정보 유출, 계약서 미작성, 명예훼손, 가정폭력, 기타
+
+            문장: {user_input}
+            """
+            issue_type_msg = llm.invoke(issue_classification_prompt)
+            issue_type = issue_type_msg.content.strip() 
+            st.markdown(f"🧠 감지된 법적 이슈: **{issue_type}**")
+
+            # 2️⃣ DuckDuckGo 검색 (문제 유형 기반)
+            query = f"{issue_type} 관련 신고 절차 site:moel.go.kr OR site:gov.kr OR site:minwon.go.kr"
+            search_result = search_tool.run(query)
+
+            # 3️⃣ GPT에게 해결 방안 요청
             final_prompt = f"""
+            감지된 법적 이슈: {issue_type}
+
             사용자의 질문: {user_input}
 
-            다음은 관련 법률 정보, 기관 안내 및 해결 절차에 대한 검색 결과입니다:
+            다음은 해당 이슈에 대한 공식 문서 검색 결과입니다:
             {search_result}
 
-            위 정보를 바탕으로 한국 법률 기준에 따라 구체적인 해결책(기관명, 절차, 필요서류, 신고링크 등)을 제시하세요.
+            위 정보를 바탕으로, 법률 전문가로서 해결 방법을 안내하세요.
+            (기관명, 해결 절차, 제출 서류, 신고 링크 등 포함)
             """
-            response = conversation.predict(input = final_prompt)
+            response = conversation.predict(input=final_prompt)
+
+            # 🧾 GPT 답변 출력
             st.markdown(response)
 
             # 🔎 응답에서 링크 모두 추출 (마크다운 + 일반 URL + HTML 링크)
