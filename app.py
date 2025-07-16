@@ -22,12 +22,7 @@ tools = [
     )
 ]
 
-def build_official_query(user_input): # 사용자 입력 기준 공식 문서 검색을 위해 site 제한
-    # 사용자 입력에 'site:' 및 키워드 추가
-    base_keywords = " site:moel.go.kr OR site:gov.kr OR site:minwon.go.kr 신고 절차 해결 방법"
-    return user_input + base_keywords
-
-llm = ChatOpenAI(model="gpt-4-0125-preview", temperature=0.2) # GPT LLM 구성
+llm = ChatOpenAI(model="gpt-4.1", temperature=0.2) # GPT LLM 구성
 memory = ConversationBufferMemory(return_messages=True) # 메모리 설정 (이전 대화 기억)
 prompt = ChatPromptTemplate.from_template("""
 당신은 한국의 법률 상담 도우미입니다. 
