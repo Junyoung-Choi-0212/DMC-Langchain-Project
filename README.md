@@ -146,7 +146,7 @@ new row violates row-level security policy for table "feedback"
 - [ ] 정책의 대상이 `TO public USING (true)` 로 설정되어 있는가?
 
 ## 프로젝트 체크리스트
-- [x]  github을 활용한 프로젝트 관리
+- [x]  Github을 활용한 프로젝트 관리
   → 전체 프로젝트를 GitHub 기반으로 버전 관리하며 `.env`, `.py` 모듈, Streamlit UI, LangChain 구성을 모듈화하여 커밋 히스토리 관리.
 - [x]  문제 정의에서 시작하는 프로젝트 시작
   → "임금체불", "부당해고", "가정폭력" 등 사용자의 다양한 법률 질문에 대해 적절한 **대응 방법 안내**가 필요하다는 문제를 정의하고 시작.
@@ -173,20 +173,24 @@ new row violates row-level security policy for table "feedback"
 - GPT 개선 예시 자동 생성: 유사 질문에 더 나은 답변 예측
 - 사용자별 피드백 조회 (로그인 기반 확장 시)
 
-## 상세 기술 스택
-- **Python(v3.12.11)**: 전체 백엔드 및 LLM 처리
-- **Streamlit(v1.47.0)**: 사용자 인터페이스 구성 (chat UI, 입력창, 말풍선 등)
-- **LangChain(v0.3.26)**: GPT 호출, 프롬프트 관리, 체인 구성 등 핵심 로직
-- **OpenAI(v1.30.1)**: 자연어 처리 및 요약 생성 LLM
-- **Serper.dev API**: `.go.kr` 공식 문서 검색 (Google 기반)
-- **Selenium(v4.34.2) + BeautifulSoup(v4.13.4)**: 동적 웹페이지 크롤링 및 본문 텍스트 추출
-- **python-dotenv(v1.1.1)**: API 키 및 환경 변수 관리
-- **webdriver-manager(v4.0.2)**: 크롬 드라이버 자동 설치 및 관리
-- **pipreqs(v0.5.0)**: 추후 실행을 위한 requirements.txt를 제작하는데 사용(pipreqs . --force)
-- **Supabase(v2.17.0)**: 피드백(질문, 응답, 이슈 분류, 평가 결과)을 클라우드 DB에 저장
+## ✅ 상세 기술 스택
+| 기술명                     | 버전       | 설명 |
+|--------------------------|------------|------|
+| BeautifulSoup            | v4.13.4    | 동적 웹페이지의 HTML 파싱 및 본문 텍스트 추출 |
+| LangChain                | v0.3.26    | GPT 호출, 프롬프트 관리, 체인 구성 등 핵심 로직 |
+| OpenAI                   | v1.30.1    | 자연어 처리 및 요약 생성 LLM |
+| pipreqs                  | v0.5.0     | 실행을 위한 `requirements.txt` 자동 생성 (`pipreqs . --force`) |
+| python-dotenv            | v1.1.1     | API 키 및 환경 변수 관리 |
+| Python                   | v3.12.11   | 전체 백엔드 및 LLM 처리 |
+| Selenium                 | v4.34.2    | 동적 웹페이지 크롤링 자동화 |
+| Serper.dev API           | -          | `.go.kr` 공식 문서 검색 (Google 기반) |
+| Streamlit                | v1.47.0    | 사용자 인터페이스 구성 (chat UI, 입력창, 말풍선 등) |
+| Supabase                 | v2.17.0    | 피드백(질문, 응답, 이슈 분류, 평가 결과)을 클라우드 DB에 저장 |
+| webdriver-manager        | v4.0.2     | 크롬 드라이버 자동 설치 및 관리 |
+
 
 ## 참고 문서
-- [Serper API 공식 문서](https://serper.dev/docs)
-- [LangChain Docs](https://docs.langchain.com/)
 - [GPT API 공식 문서](https://platform.openai.com/docs/overview)
+- [LangChain Docs](https://docs.langchain.com/)
+- [Serper API 공식 문서](https://serper.dev/docs)
 - [Supabase Docs](https://supabase.com/docs)
