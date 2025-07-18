@@ -96,6 +96,39 @@ Streamlit 앱은 사용자 피드백 데이터를 Supabase DB에 저장합니다
 > 💡 **주의:** 테이블 생성 시 `Schema`는 반드시 `public`으로 설정하세요.  
 > `storage` 스키마는 일반 사용자가 접근 권한이 없어 오류가 발생합니다.
 
+### ✅ Supabase RLS(Row-Level Security) 설정
+피드백을 Supabase에 정상적으로 저장하려면 `feedback` 테이블의 RLS(Row-Level Security) 설정을 반드시 확인해야 합니다.
+
+#### 🔹 옵션 1: RLS 비활성화 (개발/테스트 환경용)
+- Supabase 콘솔에서 `feedback` 테이블 선택  
+- 상단 메뉴에서 **RLS** → `Disable RLS` 클릭  
+- 누구나 삽입 가능 (테스트 환경에만 권장)
+
+#### 🔹 옵션 2: RLS 활성화 상태에서 삽입 허용 정책 추가 (운영 환경 권장)
+RLS를 활성화한 경우, 다음과 같이 삽입 허용 정책을 추가해야 합니다:
+```sql
+CREATE POLICY "Allow insert from all"
+  ON public.feedback
+  FOR INSERT
+  TO public
+  USING (true);
+```
+- Supabase Console > `feedback` 테이블 > **Auth** 탭 > `Create Policy` 클릭  
+- 위 SQL을 입력 후 저장
+
+> ⚠️ 정책이 없거나 Supabase 키가 잘못된 경우 다음과 같은 오류가 발생할 수 있습니다:
+
+```pgsql
+new row violates row-level security policy for table "feedback"
+```
+
+#### 🧩 삽입 실패 시 체크리스트
+✅ 아래 항목들을 하나씩 확인하세요:
+- [ ] Supabase 키로 **anon(public)** 키를 사용하고 있는가?
+- [ ] 컬럼명은 `question`, `answer`, `issue_type`, `feedback` 과 정확히 일치하는가?
+- [ ] RLS가 활성화되어 있고, 위 정책이 존재하는가?
+- [ ] 정책의 대상이 `TO public USING (true)` 로 설정되어 있는가?
+
 ## 프로젝트 체크리스트
 - [x]  github을 활용한 프로젝트 관리
   → 전체 프로젝트를 GitHub 기반으로 버전 관리하며 `.env`, `.py` 모듈, Streamlit UI, LangChain 구성을 모듈화하여 커밋 히스토리 관리.
@@ -126,7 +159,7 @@ Streamlit 앱은 사용자 피드백 데이터를 Supabase DB에 저장합니다
 
 ## 상세 기술 스택
 - **Python(v3.12.11)**: 전체 백엔드 및 LLM 처리
-- **Streamlit(v1.46.1)**: 사용자 인터페이스 구성 (chat UI, 입력창, 말풍선 등)
+- **Streamlit(v1.47.0)**: 사용자 인터페이스 구성 (chat UI, 입력창, 말풍선 등)
 - **LangChain(v0.3.26)**: GPT 호출, 프롬프트 관리, 체인 구성 등 핵심 로직
 - **OpenAI(v1.30.1)**: 자연어 처리 및 요약 생성 LLM
 - **Serper.dev API**: `.go.kr` 공식 문서 검색 (Google 기반)

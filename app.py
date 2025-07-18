@@ -41,9 +41,6 @@ issue_chain = LLMChain( # 이슈 분류 LLMChain
 st.set_page_config(page_title="법률 상담 챗봇", layout="wide")
 st.markdown("## 🧑‍⚖️ 법률 챗봇 (LangChain + GPT)")
 
-# 대화 입력
-user_input = st.chat_input("질문을 입력하세요...")
-
 # 대화 히스토리 출력
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
@@ -53,73 +50,119 @@ for role, msg in st.session_state.chat_history:
         st.markdown(msg if role != "🧑‍💼 질문" else f"**{msg}**")
 
 # 입력이 있는 경우 → 답변 받고 출력
-if user_input:
+if st.session_state.get("trigger_gpt", False):
+    st.session_state.trigger_gpt = False
+    user_input = st.session_state.user_input
+
     with st.chat_message("user"):
         st.markdown(f"**{user_input}**")
 
     with st.chat_message("assistant"):
-        with st.spinner("GPT가 해결 방안을 분석 중입니다..."):
-            # 1️⃣ GPT로 법적 이슈 분류
-            issue_type = issue_chain.run({"user_input": user_input}).strip()
-            st.markdown(f"🧠 감지된 법적 이슈: **{issue_type}**")
+        try:
+            with st.spinner("GPT가 해결 방안을 분석 중입니다..."):
+                issue_type = issue_chain.run({"user_input": user_input}).strip()
+                st.markdown(f"🧠 감지된 법적 이슈: **{issue_type}**")
 
-            # 2️⃣ Serper 검색 (문제 유형 기반)
-            SERPER_API_KEY = os.getenv("SERPER_API_KEY")  # .env에서 불러오기
-            query = f"{issue_type} 관련 신고 절차 site:moel.go.kr OR site:gov.kr OR site:minwon.go.kr"
-            
-            urls = search_serper_links(query, api_key=SERPER_API_KEY)
-            first_url = urls[0] if urls else None
+                SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+                query = f"{issue_type} 관련 신고 절차 site:moel.go.kr OR site:gov.kr OR site:minwon.go.kr"
+                urls = search_serper_links(query, api_key=SERPER_API_KEY)
+                first_url = urls[0] if urls else None
+                page_text = get_dynamic_page_text(first_url) if first_url else "[관련 페이지 없음]"
 
-            # for url in urls: # 크롤링 후보군 디버깅용 UI
-            #     st.markdown(f'크롤링 후보군: {url}')
+                feedback = get_similar_negative_feedback(supabase_client, user_input)
+                if feedback:
+                    prompt_extra = f"""
+                    과거 비슷한 질문에 대해 다음과 같은 GPT 응답이 있었고, 사용자는 이를 '부족하다'고 평가했습니다:
 
-            page_text = get_dynamic_page_text(first_url) if first_url else "[관련 페이지 없음]"
+                    질문: {feedback['question']}
+                    응답: {feedback['answer']}
 
-            # 3️⃣ GPT에게 해결 방안 요청
-            feedback = get_similar_negative_feedback(supabase_client, user_input) # 이전에 부정적인 피드백이 있었는지 supabase 조회
-            if feedback: # 있었다면
-                prompt_extra = f"""
-            과거 비슷한 질문에 대해 다음과 같은 GPT 응답이 있었고, 사용자는 이를 '부족하다'고 평가했습니다:
+                    → 이번에는 더 구체적인 안내 (기관명, 신고 절차, 서류명 등)를 포함하여 다시 답변해주세요.
+                    """
+                    enriched_input = prompt_extra + "\n\n현재 사용자 질문: " + user_input
+                else:
+                    enriched_input = user_input
 
-            질문: {feedback['question']}
-            응답: {feedback['answer']}
+                combined_input = f"{enriched_input}\n\n[공공기관 본문 요약 참고]\n{page_text}"
+                print("🧪 GPT 응답 전 실행 도달")
+                response = chain.run({"user_input": combined_input})
+                print("✅ GPT 응답 완료")
 
-            → 이번에는 더 구체적인 안내 (기관명, 신고 절차, 서류명 등)를 포함하여 다시 답변해주세요.
-            """
-                enriched_input = prompt_extra + "\n\n현재 사용자 질문: " + user_input
-            else: # 없다면
-                enriched_input = user_input
+                st.session_state.last_input = user_input
+                st.session_state.last_response = response
+                st.session_state.last_issue = issue_type
 
-            # 최종 GPT 입력 구성
-            combined_input = f"{enriched_input}\n\n[공공기관 본문 요약 참고]\n{page_text}"
-            response = chain.run({"user_input": combined_input})
+                st.markdown(response)
 
-            # 🧾 GPT 답변 출력
-            st.markdown(response)
+                urls = extract_links(response)
+                if urls:
+                    with st.expander("🔗 관련 링크 보기"):
+                        for url in urls[:3]:
+                            st.markdown(f"- [{url}]({url})")
+                else:
+                    st.info("🔗 GPT 응답에 링크가 포함되지 않았습니다.")
 
-            # 🔎 응답에서 링크 모두 추출 (마크다운 + 일반 URL + HTML 링크)
-            urls = extract_links(response)
-            if urls:
-                with st.expander("🔗 관련 링크 보기"):
-                    for url in urls[:3]:
-                        st.markdown(f"- [{url}]({url})")
-            else: st.info("🔗 GPT 응답에 링크가 포함되지 않았습니다.")
-            
-            with st.expander("📝 참고한 페이지 본문 보기"):
-                st.markdown(f'참고한 페이지 링크: {first_url}')
-                st.markdown(page_text if page_text else "_본문 없음_")
-            
-            # 사용자 평가 버튼
-            col1, col2 = st.columns([1, 1])
-            with col1:
-                if st.button("👍 도움이 되었어요", key="thumbs_up"):
-                    st.success("감사합니다! 도움이 되었다니 기쁩니다.")
-                    save_feedback_to_supabase(supabase_client, user_input, response, issue_type, "👍")
-            with col2:
-                if st.button("👎 부족했어요", key="thumbs_down"):
-                    st.warning("죄송합니다. 더 나은 답변을 위해 개선하겠습니다.")
-                    save_feedback_to_supabase(supabase_client, user_input, response, issue_type, "👎")
+                with st.expander("📝 참고한 페이지 본문 보기"):
+                    st.markdown(f'참고한 페이지 링크: {first_url}')
+                    st.markdown(page_text if page_text else "_본문 없음_")
+        except Exception as e:
+            st.error("❌ GPT 실행 중 오류가 발생했습니다.")
+            st.exception(e)
 
-    # 세션 상태에 저장
     st.session_state.chat_history.append(("🧑‍💼 질문", user_input))
     st.session_state.chat_history.append(("🤖 GPT", response))
+    st.session_state.user_input = ""
+
+# 평가 UI
+# 평가 상태 체크: 한 번 평가하면 버튼 숨기고 메시지 표시
+if "last_response" in st.session_state and st.session_state.last_response:
+    st.markdown("### 📊 이 답변이 도움이 되었나요?")
+
+    if st.session_state.get("feedback_done") is None:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            with st.form("form_up"):
+                if st.form_submit_button("👍 도움이 되었어요"):
+                    save_feedback_to_supabase(
+                        supabase_client,
+                        st.session_state.last_input,
+                        st.session_state.last_response,
+                        st.session_state.last_issue,
+                        "👍"
+                    )
+                    st.session_state.feedback_done = "👍"
+                    st.rerun()
+
+        with col2:
+            with st.form("form_down"):
+                if st.form_submit_button("👎 부족했어요"):
+                    save_feedback_to_supabase(
+                        supabase_client,
+                        st.session_state.last_input,
+                        st.session_state.last_response,
+                        st.session_state.last_issue,
+                        "👎"
+                    )
+                    st.session_state.feedback_done = "👎"
+                    st.rerun()
+    
+    else:
+        if st.session_state.feedback_done == "👍":
+            st.success("감사합니다! 도움이 되었다니 기쁩니다.")
+        elif st.session_state.feedback_done == "👎":
+            st.warning("죄송합니다. 더 나은 답변을 위해 개선하겠습니다.")
+
+# 평가 후 초기화
+if st.session_state.get("feedback_submitted", False):
+    st.session_state.feedback_submitted = False
+    st.session_state.last_input = ""
+    st.session_state.last_response = ""
+    st.session_state.last_issue = ""
+    st.session_state.user_input = ""
+
+def submit_question():
+    st.session_state.trigger_gpt = True
+    st.session_state.feedback_done = None
+
+st.text_input("질문을 입력하세요:", key="user_input", on_change=submit_question)

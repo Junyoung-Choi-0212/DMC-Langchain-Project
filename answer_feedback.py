@@ -8,13 +8,20 @@ def create_feedback_client():
     return create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_KEY"))
 
 def save_feedback_to_supabase(client, question, answer, issue_type, feedback):
+    print("🚀 저장 시도 중...")
+
     data = {
         "question": question,
         "answer": answer,
         "issue_type": issue_type,
         "feedback": feedback
     }
-    client.table("feedback").insert(data).execute()
+
+    try:
+        response = client.table("feedback").insert(data).execute()
+        print("✅ Supabase 저장 성공:", response)
+    except Exception as e:
+        print("❌ Supabase 저장 실패:", e)
 
 def get_similar_negative_feedback(client, new_question: str, threshold: float = 0.6) -> Optional[dict]:
     """
