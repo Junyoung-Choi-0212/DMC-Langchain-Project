@@ -73,6 +73,28 @@ SUPABASE_KEY=your_key_here
 ```bash
 streamlit run app.py
 ```
+5. Supabase 테이블 구성
+
+Streamlit 앱은 사용자 피드백 데이터를 Supabase DB에 저장합니다.  
+앱 실행 전, 다음과 같이 `feedback` 테이블을 생성하세요.
+
+### ✅ 테이블 생성 방법
+
+1. Supabase 프로젝트에 접속 → `Table Editor` 클릭
+2. `New Table` → 이름: `feedback`
+3. 다음과 같이 컬럼을 추가하고 저장합니다:
+
+| 컬럼명       | 타입        | 옵션                                           |
+|--------------|-------------|------------------------------------------------|
+| `id`         | int8        | Primary Key ✅, Is Identity ✅, Is Unique ✅     |
+| `question`   | text        | 질문 내용                                     |
+| `answer`     | text        | GPT가 생성한 답변                             |
+| `issue_type` | text        | GPT가 분류한 법적 이슈 (예: 임금체불)         |
+| `feedback`   | text        | 사용자 평가 (`👍` 또는 `👎`)                  |
+| `created_at` | timestamp   | 기본값: `now()`                                |
+
+> 💡 **주의:** 테이블 생성 시 `Schema`는 반드시 `public`으로 설정하세요.  
+> `storage` 스키마는 일반 사용자가 접근 권한이 없어 오류가 발생합니다.
 
 ## 프로젝트 체크리스트
 - [x]  github을 활용한 프로젝트 관리
