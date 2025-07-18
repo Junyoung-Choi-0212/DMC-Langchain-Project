@@ -1,11 +1,11 @@
+from answer_feedback import create_feedback_client, get_similar_negative_feedback, save_feedback_to_supabase
 from dotenv import load_dotenv
-from langchain.agents import Tool
-from langchain.chains import ConversationChain
+from langchain.chains import LLMChain
 from langchain_core.output_parsers import StrOutputParser
-from langchain_community.tools import DuckDuckGoSearchResults
+from langchain_core.runnables import RunnableMap
 from langchain.memory import ConversationBufferMemory
 from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate
+from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from utils import extract_links
 from web_crawling import get_dynamic_page_text
 from web_search import search_serper_links
@@ -14,41 +14,27 @@ import os
 import streamlit as st
 
 load_dotenv()
-
-# 사용자의 input을 기준으로 검색할 tool 세팅
-search_tool = DuckDuckGoSearchResults()
-tools = [
-    Tool(
-        name="web_search",
-        func=search_tool.run,
-        description="사용자의 법률 질문과 관련된 공공기관 웹 정보를 검색합니다."
-    )
-]
+supabase_client = create_feedback_client()
 
 llm = ChatOpenAI(model="gpt-4.1", temperature=0.2) # GPT LLM 구성
 memory = ConversationBufferMemory(return_messages=True) # 메모리 설정 (이전 대화 기억)
-prompt = ChatPromptTemplate.from_template("""
-당신은 한국의 법률 상담 도우미입니다. 
-아래는 지금까지의 대화입니다:
-
-{history}
-
----
-
-현재 사용자 질문:
-{input}
-
-법적 이슈를 분류하고, 구체적인 해결 방안을 설명해주세요 (기관명, 절차, 필요서류, 제출링크 등).
-""")
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "당신은 한국 법률 전문가입니다. 사용자 질문을 바탕으로 법적 이슈를 분류하고, 실제 공공기관 정보를 활용해 해결 방법을 안내하세요."),
+    MessagesPlaceholder(variable_name="history"),
+    ("user", "{user_input}")
+])
 output_parser = StrOutputParser() # 출력 파서
+chain = LLMChain(llm=llm, prompt=prompt, memory=memory, output_parser=StrOutputParser()) # LLMChain으로 대화형 챗 구성
 
-# ConversationChain으로 대화형 챗 구성
-conversation = ConversationChain(
-    llm=llm,
-    memory=memory,
-    prompt=prompt,
-    output_parser=output_parser,
-    verbose=True
+
+issue_prompt = ChatPromptTemplate.from_messages([ # 이슈 분류용 프롬프트
+    ("system", "다음 사용자의 문장은 어떤 법적 이슈에 해당하는지 한 단어 또는 짧은 문장으로 분류하세요. (예: 임금체불, 부당해고, 개인정보 유출 등)"),
+    ("user", "{user_input}")
+])
+issue_chain = LLMChain( # 이슈 분류 LLMChain
+    llm=ChatOpenAI(model="gpt-4.1", temperature=0.0),
+    prompt=issue_prompt,
+    output_parser=StrOutputParser()
 )
 
 # Streamlit 앱
@@ -74,16 +60,7 @@ if user_input:
     with st.chat_message("assistant"):
         with st.spinner("GPT가 해결 방안을 분석 중입니다..."):
             # 1️⃣ GPT로 법적 이슈 분류
-            issue_classification_prompt = f"""
-            다음 문장은 어떤 법적 문제에 해당합니까?
-            가능한 분류 중 정확히 하나만 골라주세요:
-
-            분류: 임금체불, 부당해고, 개인정보 유출, 계약서 미작성, 명예훼손, 가정폭력, 기타
-
-            문장: {user_input}
-            """
-            issue_type_msg = llm.invoke(issue_classification_prompt)
-            issue_type = issue_type_msg.content.strip() 
+            issue_type = issue_chain.run({"user_input": user_input}).strip()
             st.markdown(f"🧠 감지된 법적 이슈: **{issue_type}**")
 
             # 2️⃣ Serper 검색 (문제 유형 기반)
@@ -99,22 +76,23 @@ if user_input:
             page_text = get_dynamic_page_text(first_url) if first_url else "[관련 페이지 없음]"
 
             # 3️⃣ GPT에게 해결 방안 요청
-            final_prompt = f"""
-            감지된 법적 이슈: {issue_type}
+            feedback = get_similar_negative_feedback(supabase_client, user_input) # 이전에 부정적인 피드백이 있었는지 supabase 조회
+            if feedback: # 있었다면
+                prompt_extra = f"""
+            과거 비슷한 질문에 대해 다음과 같은 GPT 응답이 있었고, 사용자는 이를 '부족하다'고 평가했습니다:
 
-            사용자의 질문: {user_input}
+            질문: {feedback['question']}
+            응답: {feedback['answer']}
 
-            다음은 해당 이슈에 대한 공식 문서 검색 결과 중 상위 결과 1개의 실제 페이지 본문입니다.
-
-            **단, 이 본문에는 상단 메뉴/고객센터/저작권 등의 부가 텍스트도 포함되어 있을 수 있으므로**,  
-            실제 법률적 해결 방법과 절차, 신고 기관, 처리 순서, 주의사항, 서류 안내 등 **핵심 정보만 선별하여** 사용자의 질문에 맞는 해결 방법을 정리해 주세요.
-
-            공식 본문:
-            {page_text}
-
-            위 내용을 종합해 사용자가 취해야 할 법적 대응 절차를 알려주세요.
+            → 이번에는 더 구체적인 안내 (기관명, 신고 절차, 서류명 등)를 포함하여 다시 답변해주세요.
             """
-            response = conversation.predict(input=final_prompt)
+                enriched_input = prompt_extra + "\n\n현재 사용자 질문: " + user_input
+            else: # 없다면
+                enriched_input = user_input
+
+            # 최종 GPT 입력 구성
+            combined_input = f"{enriched_input}\n\n[공공기관 본문 요약 참고]\n{page_text}"
+            response = chain.run({"user_input": combined_input})
 
             # 🧾 GPT 답변 출력
             st.markdown(response)
@@ -130,6 +108,17 @@ if user_input:
             with st.expander("📝 참고한 페이지 본문 보기"):
                 st.markdown(f'참고한 페이지 링크: {first_url}')
                 st.markdown(page_text if page_text else "_본문 없음_")
+            
+            # 사용자 평가 버튼
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.button("👍 도움이 되었어요", key="thumbs_up"):
+                    st.success("감사합니다! 도움이 되었다니 기쁩니다.")
+                    save_feedback_to_supabase(supabase_client, user_input, response, issue_type, "👍")
+            with col2:
+                if st.button("👎 부족했어요", key="thumbs_down"):
+                    st.warning("죄송합니다. 더 나은 답변을 위해 개선하겠습니다.")
+                    save_feedback_to_supabase(supabase_client, user_input, response, issue_type, "👎")
 
     # 세션 상태에 저장
     st.session_state.chat_history.append(("🧑‍💼 질문", user_input))

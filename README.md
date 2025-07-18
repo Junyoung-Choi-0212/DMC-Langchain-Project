@@ -17,6 +17,7 @@ Streamlit 기반 UI를 통해 실제 챗봇 형태로 법률상 대처 방안을
 - 공공기관(.go.kr) 문서 실시간 검색 (Serper API 활용)
 - Selenium 기반 동적 웹 페이지 크롤링 → 실제 본문 추출
 - GPT가 본문 + 사용자 질문을 종합하여 구체적인 해결 방안 생성
+- 사용자는 답변에 대해 👍/👎 평가를 남길 수 있으며, 해당 피드백은 Supabase에 자동 저장
 - 말풍선 형태의 대화형 UI (Streamlit 기반)
 - 검색된 공공기관 문서 링크 및 본문 미리보기 제공
 
@@ -28,6 +29,8 @@ Streamlit 기반 UI를 통해 실제 챗봇 형태로 법률상 대처 방안을
 5. GPT가 사용자 질문 + 본문을 종합하여, 다음과 같은 해결 방법을 생성:
 > 💬 **GPT 응답 예시**  
 > “고용노동부 노동포털에서 '임금체불 진정서'를 제출할 수 있습니다. 온라인 민원 접수 경로는 다음과 같습니다...”
+6. 사용자는 GPT의 응답에 대해 👍 또는 👎 평가를 남길 수 있으며,
+   해당 피드백은 Supabase에 저장되어 추후 응답 품질 개선에 활용됩니다.
 
 ## 예시 질문
 **노동 관련**
@@ -63,6 +66,8 @@ pip install -r requirements.txt
 # .env 예시
 OPENAI_API_KEY=your_key_here
 SERPER_API_KEY=your_key_here
+SUPABASE_URL=your_key_here
+SUPABASE_KEY=your_key_here
 ```
 4. 실행
 ```bash
@@ -78,7 +83,7 @@ streamlit run app.py
   → GPT를 단순 질의응답이 아닌 RAG(Retrieval Augmented Generation) 구조로 사용.  
     - `Serper.dev` API를 활용해 `.go.kr` 공공기관 웹문서를 검색  
     - `Selenium` 기반 크롤링으로 동적 페이지 본문을 추출  
-    - LangChain의 `ChatOpenAI`, `PromptTemplate`, `ConversationChain` 구성  
+    - LangChain의 `ChatOpenAI`, `PromptTemplate`, `LLMChain` 구성  
     - 검색 결과 + 사용자 질문 + 크롤링 본문을 GPT에게 통합 전달 → 해결책 생성
 - [x]  문제 정의 → RAG → 해결
   → 전체 구조를 `문제 정의 → 자동 이슈 분류(GPT) → 공공문서 검색(Serper) → 본문 수집(Selenium) → GPT 요약` 흐름으로 완성.  
@@ -89,6 +94,13 @@ streamlit run app.py
 - 다양한 법률 분야에 대응 가능한 이슈 분류 시스템 설계
 - Serper API + Selenium을 연계한 실시간 웹 문서 기반 답변 생성
 - 사용자 중심의 Streamlit 챗봇 UI 설계 및 상태 관리 구현
+- 사용자 피드백(👍/👎)을 수집하고, 이를 향후 응답 품질 개선에 반영하는 구조 설계
+
+## 향후 확장 아이디어
+- 피드백 통계 시각화 (Streamlit에서 평가 결과 차트로 표시)
+- 사용자 의견 수집 필드 (이유 입력: “링크가 없음”, “설명이 부족함” 등)
+- GPT 개선 예시 자동 생성: 유사 질문에 더 나은 답변 예측
+- 사용자별 피드백 조회 (로그인 기반 확장 시)
 
 ## 상세 기술 스택
 - **Python(v3.12.11)**: 전체 백엔드 및 LLM 처리
@@ -100,8 +112,10 @@ streamlit run app.py
 - **python-dotenv(v1.1.1)**: API 키 및 환경 변수 관리
 - **webdriver-manager(v4.0.2)**: 크롬 드라이버 자동 설치 및 관리
 - **pipreqs(v0.5.0)**: 추후 실행을 위한 requirements.txt를 제작하는데 사용(pipreqs . --force)
+- **Supabase(v2.17.0)**: 피드백(질문, 응답, 이슈 분류, 평가 결과)을 클라우드 DB에 저장
 
 ## 참고 문서
 - [Serper API 공식 문서](https://serper.dev/docs)
 - [LangChain Docs](https://docs.langchain.com/)
 - [GPT API 공식 문서](https://platform.openai.com/docs/overview)
+- [Supabase Docs](https://supabase.com/docs)
