@@ -51,6 +51,10 @@ Streamlit 기반 UI를 통해 실제 챗봇 형태로 법률상 대처 방안을
 • 전입신고를 안 했을 때 불이익이 있나요?
 • 방치된 차량을 신고하고 싶은데 어떤 절차가 있나요?
 
+## 시연 영상
+아래 이미지를 클릭하면 YouTube에서 시연 영상을 확인할 수 있습니다:
+[![영상 제목](https://img.youtube.com/vi/2Wz8JQdL-Jg/0.jpg)](https://www.youtube.com/watch?v=2Wz8JQdL-Jg)
+
 ## 프로젝트 실행 순서
 1. Repository clone
 ```bash
